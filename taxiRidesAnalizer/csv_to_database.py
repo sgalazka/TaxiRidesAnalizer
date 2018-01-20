@@ -2,7 +2,6 @@
 
 import math
 from csv import DictReader
-
 from couchdbkit import Server
 
 keys = ["pickup_datetime", "pickup_latitude", "pickup_longitude", "dropoff_datetime", "dropoff_latitude",
@@ -52,5 +51,9 @@ def uploadFile(fname, database):
     docs = upload(database, docs)
 
 
-def importCsvToDatabase(filename, database):
+def importCsvToDatabase(filename):
+    uri = "http://127.0.0.1:5984/"
+    dbname = "taxi_rides"
+    dbServer = Server(uri)
+    database = dbServer.get_or_create_db(dbname)
     uploadFile(filename, database)
