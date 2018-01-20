@@ -2,9 +2,10 @@ import networkx as nx
 from networkx.algorithms import bipartite
 import matplotlib.pyplot as plt
 import numpy as np
+import googlemaps
 
 
-def get_graph():
+def get_manual_graph():
     mdg = nx.MultiDiGraph()
     mdg.add_edge(1, 2)
     mdg.add_edge(1, 2)
@@ -25,8 +26,67 @@ def get_graph():
     return mdg
 
 
+def get_graph_from_csv(file_path):
+
+    mdg = nx.MultiDiGraph()
+    gmaps = googlemaps.Client(key='AIzaSyBabsATfHAXSihzTwbxTjV9Jqh3MrmZVHs')
+
+    with open(file_path, 'r') as f:
+        header_line = f.readline()
+        print(header_line)
+        header = {}
+        for head in header_line.split(','):
+            header[head] = len(header)
+
+        for data_line in f:
+            data = data_line.split(',')
+            pickup_latitude = data[header['pickup_latitude']]
+            pickup_longitude = data[header['pickup_longitude']]
+            dropoff_latitude = data[header['dropoff_latitude']]
+            dropoff_longitude = data[header['dropoff_longitude']]
+
+            startPointResponce = gmaps.reverse_geocode((pickup_latitude, pickup_longitude))
+            endPointResponce = gmaps.reverse_geocode((dropoff_latitude, dropoff_longitude))
+            startPointData = next(iter(startPointResponce), None)
+            endPointData = next(iter(endPointResponce), None)
+
+            startPointPlaceId = startPointData['place_id']
+            endPointPlaceId = endPointData['place_id']
+            mdg.add_edge(startPointPlaceId, endPointPlaceId)
+
+    return mdg
+
+
 def get_random_graph():
     return nx.gnm_random_graph(10000, 1200000, seed=None, directed=True)
+
+
+def get_graph_from_db(dbServer):
+    G = nx.DiGraph()
+
+    try:
+        ridesDb = dbServer['rides']
+    except:
+        ridesDb = dbServer.create('rides')
+
+    ridesRows = ridesDb.view('_all_docs', include_docs=True)
+    rides = [row['doc'] for row in ridesRows]
+
+    for ride in rides:
+        start = ride['start_address']
+        end = ride['end_address']
+        count = ride['count']
+        G.add_edge(start, end, weight=count)
+        print("start: {}, end: {}, count: {}".format(start, end, count))
+
+
+def save_graph(G, file_path):
+    nx.write_weighted_edgelist(G, file_path)
+
+
+def read_graph(file_path):
+    G = nx.read_weighted_edgelist(file_path, create_using=nx.MultiDiGraph)
+    return G
 
 
 def merge_edges(M):
@@ -37,6 +97,10 @@ def merge_edges(M):
         else:
             G.add_edge(u, v, weight=1)
 
+    return G
+
+
+def calculate_weights(G):
     for u, v in G.edges():
         G[u][v]['weight'] = round(G[u][v]['weight'] / M.out_degree(u), 2)
 
@@ -92,7 +156,8 @@ def show(G):
 
 if __name__ == '__main__':
     print("get_random_graph")
-    g = get_random_graph()
+    g = get_graph_from_csv('ride.csv')
+    save_graph(g, 'ride_processed.csv')
     # show(g)
     print("merge_edges")
     g = merge_edges(g)

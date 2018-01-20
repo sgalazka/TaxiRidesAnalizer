@@ -1,20 +1,17 @@
 import couchdb
-
-import create_graph
 import csv_to_database
-import googlemaps
-import json
-
 import transform
+import recostruct
 
 if __name__ == '__main__':
-    print("hello world")
-    uri = "http://127.0.0.1:5984/"
+    uri = "http://admin:admin@127.0.0.1:5984/"
     dbname = "taxi_rides"
 
     dbServer = couchdb.Server(uri)
 
     csv_to_database.importCsvToDatabase("rides.csv")
     transform.transformAddresses(dbServer)
-    create_graph.create_graph(dbServer)
+
+    G = recostruct.create_graph(dbServer)
+    recostruct.show(G)
 
