@@ -26,7 +26,7 @@ def get_graph():
 
 
 def get_random_graph():
-    return nx.gnm_random_graph(5, 12, seed=None, directed=True)
+    return nx.gnm_random_graph(10000, 1200000, seed=None, directed=True)
 
 
 def merge_edges(M):
@@ -50,13 +50,16 @@ def trim_edges(G):
             weights.append(G[u][v]['weight'])
         std = np.std(weights)
         mean = np.mean(weights)
-        min_weight = mean # - std
+        min_weight = mean - std
         edges_to_remove = [(u, v) for u, v in G.edges(node) if G[u][v]['weight'] < min_weight]
         G.remove_edges_from(edges_to_remove)
 
+    return G
+
+
+def remove_unconnected_nodes(G):
     not_connected_nodes = [node for node in G.nodes() if G.degree(node) == 0]
     G.remove_nodes_from(not_connected_nodes)
-
     return G
 
 
@@ -75,15 +78,6 @@ def project(G):
     return G
 
 
-# def reconstruct(directed_multigraph):
-#     directed_weighted_graph = merge_edges(directed_multigraph)
-#     # trim edges
-#     trimmed_directed_weighted_graph = trim_edges(directed_weighted_graph)
-#     # bipartie graph (not directed)
-#     # projection
-#     return trimmed_directed_weighted_graph
-
-
 def show(G):
     pos = nx.spring_layout(G)
     nx.draw(G, pos)
@@ -97,15 +91,24 @@ def show(G):
 
 
 if __name__ == '__main__':
-    g = get_graph()
-    show(g)
+    print("get_random_graph")
+    g = get_random_graph()
+    # show(g)
+    print("merge_edges")
     g = merge_edges(g)
-    show(g)
+    # show(g)
+    print("trim_edges")
     g = trim_edges(g)
-    show(g)
+    g = remove_unconnected_nodes(g)
+    # show(g)
+    print("directed_to_bipartie")
     g = directed_to_bipartie(g)
-    show(g)
+    g = remove_unconnected_nodes(g)
+    # show(g)
+    print("project")
     g = project(g)
-    show(g)
+    g = remove_unconnected_nodes(g)
+    # show(g)
+    print("finish")
 
 
