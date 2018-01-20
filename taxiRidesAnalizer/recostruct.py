@@ -28,31 +28,46 @@ def get_manual_graph():
 
 def get_graph_from_csv(file_path):
 
-    mdg = nx.MultiDiGraph()
+    mdg = nx.DiGraph()
     gmaps = googlemaps.Client(key='AIzaSyBabsATfHAXSihzTwbxTjV9Jqh3MrmZVHs')
 
     with open(file_path, 'r') as f:
         header_line = f.readline()
-        print(header_line)
         header = {}
         for head in header_line.split(','):
             header[head] = len(header)
+        f.readline()  # empty line
 
         for data_line in f:
-            data = data_line.split(',')
-            pickup_latitude = data[header['pickup_latitude']]
-            pickup_longitude = data[header['pickup_longitude']]
-            dropoff_latitude = data[header['dropoff_latitude']]
-            dropoff_longitude = data[header['dropoff_longitude']]
+            try:
+                data = data_line.split(',')
+                pickup_latitude = float(data[header['pickup_latitude']])
+                pickup_longitude = float(data[header['pickup_longitude']])
+                dropoff_latitude = float(data[header['dropoff_latitude']])
+                dropoff_longitude = float(data[header['dropoff_longitude']])
 
-            startPointResponce = gmaps.reverse_geocode((pickup_latitude, pickup_longitude))
-            endPointResponce = gmaps.reverse_geocode((dropoff_latitude, dropoff_longitude))
-            startPointData = next(iter(startPointResponce), None)
-            endPointData = next(iter(endPointResponce), None)
+                if False:  # True - use Google; False - hash lat and lng
+                    startPointResponce = gmaps.reverse_geocode((pickup_latitude, pickup_longitude))
+                    endPointResponce = gmaps.reverse_geocode((dropoff_latitude, dropoff_longitude))
+                    startPointData = next(iter(startPointResponce), None)
+                    endPointData = next(iter(endPointResponce), None)
 
-            startPointPlaceId = startPointData['place_id']
-            endPointPlaceId = endPointData['place_id']
-            mdg.add_edge(startPointPlaceId, endPointPlaceId)
+                    startPointPlaceId = startPointData['place_id']
+                    endPointPlaceId = endPointData['place_id']
+                else:
+                    def my_hash(lat, lng):
+                        precission = 3
+                        return round(lat, precission) * 10**(precission+1) + round(lng, precission)
+                    startPointPlaceId = my_hash(pickup_latitude, pickup_longitude)
+                    endPointPlaceId = my_hash(dropoff_latitude, dropoff_longitude)
+
+                if mdg.has_edge(startPointPlaceId, endPointPlaceId):
+                    mdg[startPointPlaceId][endPointPlaceId]['weight'] += 1
+                else:
+                    mdg.add_edge(startPointPlaceId, endPointPlaceId)
+                    mdg[startPointPlaceId][endPointPlaceId]['weight'] = 1
+            except ValueError:
+                print("Bad line: " + data_line)
 
     return mdg
 
@@ -79,6 +94,8 @@ def get_graph_from_db(dbServer):
         G.add_edge(start, end, weight=count)
         print("start: {}, end: {}, count: {}".format(start, end, count))
 
+    return G
+
 
 def save_graph(G, file_path):
     nx.write_weighted_edgelist(G, file_path)
@@ -101,8 +118,12 @@ def merge_edges(M):
 
 
 def calculate_weights(G):
-    for u, v in G.edges():
-        G[u][v]['weight'] = round(G[u][v]['weight'] / M.out_degree(u), 2)
+    for node in G.nodes():
+        weights_sum = 0
+        for u, v in G.edges(node):
+            weights_sum += G[u][v]['weight']
+        for u, v in G.edges(node):
+            G[u][v]['weight'] = round(G[u][v]['weight'] / weights_sum, 2)
 
     return G
 
@@ -112,11 +133,12 @@ def trim_edges(G):
         weights = []
         for u, v in G.edges(node):
             weights.append(G[u][v]['weight'])
-        std = np.std(weights)
-        mean = np.mean(weights)
-        min_weight = mean - std
-        edges_to_remove = [(u, v) for u, v in G.edges(node) if G[u][v]['weight'] < min_weight]
-        G.remove_edges_from(edges_to_remove)
+        if weights:
+            std = np.std(weights)
+            mean = np.mean(weights)
+            min_weight = mean - std
+            edges_to_remove = [(u, v) for u, v in G.edges(node) if G[u][v]['weight'] < min_weight]
+            G.remove_edges_from(edges_to_remove)
 
     return G
 
@@ -136,10 +158,10 @@ def directed_to_bipartie(D):
     return B
 
 
-def project(G):
-    pickup_nodes = [node for node in G.nodes() if node > 0]
-    G = bipartite.projected_graph(G, pickup_nodes)
-    return G
+def project(B):
+    pickup_nodes = [node for node in B.nodes() if node > 0]
+    P = bipartite.projected_graph(B, pickup_nodes)
+    return P
 
 
 def show(G):
@@ -155,13 +177,15 @@ def show(G):
 
 
 if __name__ == '__main__':
-    print("get_random_graph")
-    g = get_graph_from_csv('ride.csv')
-    save_graph(g, 'ride_processed.csv')
+    print("get_graph")
+    g = get_graph_from_csv('yellow_tripdata_2011-12.csv')
+    # g = read_graph('rides_processed.csv')
     # show(g)
     print("merge_edges")
-    g = merge_edges(g)
+    # g = merge_edges(g)
+    g = calculate_weights(g)
     # show(g)
+    # save_graph(g, 'rides_processed.csv')
     print("trim_edges")
     g = trim_edges(g)
     g = remove_unconnected_nodes(g)
@@ -173,7 +197,7 @@ if __name__ == '__main__':
     print("project")
     g = project(g)
     g = remove_unconnected_nodes(g)
-    # show(g)
     print("finish")
+    # show(g)
 
 

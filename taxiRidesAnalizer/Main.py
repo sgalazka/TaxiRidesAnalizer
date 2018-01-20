@@ -12,6 +12,6 @@ if __name__ == '__main__':
     csv_to_database.importCsvToDatabase("rides.csv")
     transform.transformAddresses(dbServer)
 
-    G = recostruct.create_graph(dbServer)
+    G = recostruct.get_graph_from_db(dbServer)
     recostruct.show(G)
 
