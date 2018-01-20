@@ -1,5 +1,6 @@
 import couchdb
 
+import create_graph
 import csv_to_database
 import googlemaps
 import json
@@ -15,4 +16,5 @@ if __name__ == '__main__':
 
     csv_to_database.importCsvToDatabase("rides.csv")
     transform.transformAddresses(dbServer)
+    create_graph.create_graph(dbServer)
 
