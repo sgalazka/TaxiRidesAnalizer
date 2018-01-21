@@ -41,10 +41,20 @@ def get_graph_from_csv(file_path):
         for data_line in f:
             try:
                 data = data_line.split(',')
-                pickup_latitude = float(data[header['pickup_latitude']])
                 pickup_longitude = float(data[header['pickup_longitude']])
-                dropoff_latitude = float(data[header['dropoff_latitude']])
+                pickup_latitude = float(data[header['pickup_latitude']])
                 dropoff_longitude = float(data[header['dropoff_longitude']])
+                dropoff_latitude = float(data[header['dropoff_latitude']])
+
+                if not (-80.0 < pickup_longitude < -70.0) or \
+                        not (35.0 < pickup_latitude < 45.0) or \
+                        not (-80.0 < dropoff_longitude < -70.0) or \
+                        not (35.0 < dropoff_latitude < 45.0):
+                    # print('Skipping line due to strange geo: ' + str(pickup_longitude) + ' '
+                    #       + str(pickup_latitude) + ' '
+                    #       + str(dropoff_longitude) + ' '
+                    #       + str(dropoff_latitude) + ' ')
+                    continue
 
                 if False:  # True - use Google; False - hash lat and lng
                     startPointResponce = gmaps.reverse_geocode((pickup_latitude, pickup_longitude))
@@ -56,8 +66,11 @@ def get_graph_from_csv(file_path):
                     endPointPlaceId = endPointData['place_id']
                 else:
                     def my_hash(lat, lng):
-                        precission = 3
-                        return round(lat, precission) * 10**(precission+1) + round(lng, precission)
+                        precision = 3
+                        lat_int = int(round(abs(lat), precision) * 10**precision)
+                        lng_int = int(round(abs(lng), precision) * 10**precision)
+                        hashed = int(str(lng_int) + str(lat_int))
+                        return hashed
                     startPointPlaceId = my_hash(pickup_latitude, pickup_longitude)
                     endPointPlaceId = my_hash(dropoff_latitude, dropoff_longitude)
 
@@ -176,28 +189,47 @@ def show(G):
     plt.show()
 
 
+def merge_graphs(G1, G2):
+    for u, v in G2.edges():
+        if G1.has_edge(u, v):
+            G1[u][v]['weight'] += 1
+        else:
+            G1.add_edge(u, v, weight=1)
+
+    return G1
+
+
 if __name__ == '__main__':
-    print("get_graph")
-    g = get_graph_from_csv('yellow_tripdata_2011-12.csv')
-    # g = read_graph('rides_processed.csv')
-    # show(g)
-    print("merge_edges")
-    # g = merge_edges(g)
-    g = calculate_weights(g)
-    # show(g)
-    # save_graph(g, 'rides_processed.csv')
-    print("trim_edges")
-    g = trim_edges(g)
-    g = remove_unconnected_nodes(g)
-    # show(g)
-    print("directed_to_bipartie")
-    g = directed_to_bipartie(g)
-    g = remove_unconnected_nodes(g)
-    # show(g)
-    print("project")
-    g = project(g)
-    g = remove_unconnected_nodes(g)
-    print("finish")
-    # show(g)
+    def process_one_week(week):
+        print("get_graph")
+        g = get_graph_from_csv(week)
+        print("calculate_weights")
+        g = calculate_weights(g)
+        print("trim_edges")
+        g = trim_edges(g)
+        g = remove_unconnected_nodes(g)
+        print("directed_to_bipartie")
+        g = directed_to_bipartie(g)
+        g = remove_unconnected_nodes(g)
+        print("project")
+        g = project(g)
+        g = remove_unconnected_nodes(g)
+        print("finish")
+        # save_graph(g, week + '.graph')
+        return g
+
+    G = nx.Graph()
+    for g_name in ['aaa/' + str(num) for num in range(335, 366)]:
+        try:
+            print(g_name)
+            G_add = process_one_week(g_name)
+            G = merge_graphs(G, G_add)
+            del G_add
+        except IOError:
+            print('Could not process file')
+
+    file_name = 'merged.graph'
+    print('saving graph to ' + file_name)
+    save_graph(G, file_name)
 
 
