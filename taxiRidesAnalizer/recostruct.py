@@ -203,9 +203,8 @@ if __name__ == '__main__':
     def process_one_week(week):
         print("get_graph")
         g = get_graph_from_csv(week)
-        print("calculate_weights")
-        g = calculate_weights(g)
         print("trim_edges")
+        g = calculate_weights(g)
         g = trim_edges(g)
         g = remove_unconnected_nodes(g)
         print("directed_to_bipartie")
